@@ -137,7 +137,7 @@ jobs:
             -DVCPKG_MANIFEST_MODE=OFF \
             -DCMAKE_BUILD_TYPE=Release \
             -DITK_DIR="${GITHUB_WORKSPACE}/itk/build" \
-            -DVTK_DIR="${GITHUB_WORKSPACE}/vtk/install/lib/cmake/vtk-${VTK_VERSION}" \
+            -DVTK_DIR="${GITHUB_WORKSPACE}/vtk/install/lib/cmake/vtk-9.3" \
             -DCURL_LIBRARY="${GITHUB_WORKSPACE}/vcpkg/installed/x64-windows-release/lib/libcurl.lib" \
             -DCURL_INCLUDE_DIR="${GITHUB_WORKSPACE}/vcpkg/installed/x64-windows-release/include" \
             -DCMAKE_EXE_LINKER_FLAGS=/FORCE:MULTIPLE \
