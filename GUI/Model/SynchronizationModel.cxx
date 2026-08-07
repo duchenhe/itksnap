@@ -10,6 +10,11 @@
 #include "Generic3DRenderer.h"
 #include "IPCHandler.h"
 #include <chrono>
+#include <iomanip>
+#include <iostream>
+
+using std::cout;
+using std::endl;
 
 /** Structure passed on to IPC */
 struct IPCMessage

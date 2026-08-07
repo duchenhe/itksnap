@@ -10,7 +10,9 @@ class QOpenGLPaintDevice;
 class QPainter;
 class ShaderTest;
 class QPainterRenderContext;
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
 class VTKTest;
+#endif
 class QScreen;
 
 /**
@@ -51,7 +53,9 @@ private:
 
   QOpenGLFramebufferObject* m_FrameBufferObject = nullptr;
   ShaderTest *shader_test = nullptr;
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
   VTKTest *vtk_test = nullptr;
+#endif
 
   QMetaObject::Connection m_CurrentScreenChangedConnection, m_CurrentScreenGeometryChangedConnection;
 };

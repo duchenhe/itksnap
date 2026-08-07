@@ -11,12 +11,14 @@
 #include <QOpenGLBuffer>
 #include <QOpenGLShaderProgram>
 #include <QWindow>
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
+#include <vtkExternalOpenGLRenderWindow.h>
 #include <vtkPolyData.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkRenderer.h>
-#include <vtkExternalOpenGLRenderWindow.h>
 #include <vtkSphereSource.h>
 #include <vtkOpenGLFramebufferObject.h>
+#endif
 
 QtFrameBufferOpenGLWidget::QtFrameBufferOpenGLWidget(QWidget *parent)
   : QOpenGLWidget(parent)
@@ -186,6 +188,7 @@ protected:
 
 
 
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
 class VTKTest
 {
 public:
@@ -239,6 +242,7 @@ public:
   }
 
 };
+#endif
 
 
 void
@@ -248,8 +252,10 @@ QtFrameBufferOpenGLWidget::initializeGL()
   updateFBO();
   this->shader_test = new ShaderTest(this);
   this->shader_test->initializeGL();
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
   this->vtk_test = new VTKTest();
   this->vtk_test->initializeGL();
+#endif
 
   QOpenGLContext *context = QOpenGLContext::currentContext();
   if (context)
@@ -269,6 +275,7 @@ QtFrameBufferOpenGLWidget::resizeGL(int w, int h)
 {
   updateFBO();
   this->shader_test->resizeGL(w, h);
+#ifdef SNAP_HAVE_VTK_RENDERING_EXTERNAL
   this->vtk_test->resizeGL(w, h);
 
   this->vtk_test->renderWindow->SetBackLeftBuffer(GL_COLOR_ATTACHMENT0);
@@ -276,6 +283,7 @@ QtFrameBufferOpenGLWidget::resizeGL(int w, int h)
   this->vtk_test->renderWindow->SetSize(m_FrameBufferObject->size().width(), m_FrameBufferObject->size().height());
   this->vtk_test->renderWindow->SetOffScreenRendering(true);
   this->vtk_test->renderWindow->Modified();
+#endif
 }
 
 void

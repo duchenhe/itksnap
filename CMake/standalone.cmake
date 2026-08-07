@@ -69,6 +69,14 @@ INCLUDE(${ITK_USE_FILE})
 #############################################
 # REQUIRE VTK                               #
 #############################################
+OPTION(SNAP_USE_VTK_RENDERING_EXTERNAL
+  "Build the unused VTK external-render-window diagnostic helper" ON)
+IF(SNAP_USE_VTK_RENDERING_EXTERNAL)
+  SET(SNAP_VTK_RENDERING_EXTERNAL_COMPONENT RenderingExternal)
+ELSE()
+  SET(SNAP_VTK_RENDERING_EXTERNAL_COMPONENT)
+ENDIF()
+
 FIND_PACKAGE(VTK 9.3.1 REQUIRED COMPONENTS
   ChartsCore
   CommonComputationalGeometry
@@ -95,7 +103,7 @@ FIND_PACKAGE(VTK 9.3.1 REQUIRED COMPONENTS
   RenderingContext2D
   RenderingContextOpenGL2
   RenderingCore
-  RenderingExternal
+  ${SNAP_VTK_RENDERING_EXTERNAL_COMPONENT}
   RenderingLOD
   RenderingOpenGL2
   RenderingUI
@@ -164,4 +172,3 @@ IF(LIBSSH_FOUND)
   get_target_property(SSH_IMPORTED_LOCATION ssh LOCATION)
   MESSAGE(STATUS "LIBSSH library file: ${SSH_IMPORTED_LOCATION}")
 ENDIF()
-

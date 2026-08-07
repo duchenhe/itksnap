@@ -29,6 +29,8 @@ on:
         required: false
         default: false       
   push:
+    branches:
+      - master
   # release:
   # types:
   #   - published
@@ -388,5 +390,4 @@ jobs:
       
 
       
-
 

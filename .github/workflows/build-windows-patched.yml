@@ -1,0 +1,170 @@
+name: Build Windows Patched
+
+on:
+  push:
+    branches:
+      - codex/fix-oblique-orientation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-patched-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ITK_VERSION: v5.4.0
+  VTK_VERSION: 9.3.1
+  QT_VERSION: 6.8.1
+
+jobs:
+  build-windows-x64:
+    name: Windows 11 compatible x64 installer
+    runs-on: windows-2022
+    timeout-minutes: 240
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Select MSVC 2022
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --yes --no-progress
+
+      - name: Install curl, libssh, and zlib
+        id: vcpkg
+        uses: johnwason/vcpkg-action@v6
+        with:
+          pkgs: curl libssh zlib
+          triplet: x64-windows-release
+          token: ${{ github.token }}
+          github-binarycache: false
+
+      - name: Add vcpkg runtime DLLs to PATH
+        run: echo "${GITHUB_WORKSPACE}/vcpkg/installed/x64-windows-release/bin" >> "$GITHUB_PATH"
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          host: windows
+          arch: win64_msvc2022_64
+          cache: true
+          extra: --timeout 60
+
+      - name: Restore VTK cache
+        id: cache-vtk
+        uses: actions/cache@v4
+        with:
+          path: vtk/install
+          key: windows-2022-vtk-${{ env.VTK_VERSION }}-qt-${{ env.QT_VERSION }}-static-v1
+
+      - name: Check out VTK
+        if: steps.cache-vtk.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: Kitware/VTK.git
+          ref: v${{ env.VTK_VERSION }}
+          submodules: recursive
+          path: vtk
+
+      - name: Build VTK
+        if: steps.cache-vtk.outputs.cache-hit != 'true'
+        run: |
+          cmake -S vtk -B vtk/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/vtk/install" \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DVTK_REQUIRED_OBJCXX_FLAGS= \
+            -DVTK_GROUP_ENABLE_Qt=YES \
+            -DVTK_MODULE_ENABLE_VTK_GUISupportQtQuick=NO \
+            -DVTK_MODULE_ENABLE_VTK_GUISupportQtSQL=NO \
+            -DVTK_MODULE_ENABLE_VTK_RenderingExternal=WANT \
+            -DVTK_SMP_ENABLE_STDTHREAD=OFF
+          cmake --build vtk/build --target install -- -k 0
+
+      - name: Restore ITK cache
+        id: cache-itk
+        uses: actions/cache@v4
+        with:
+          path: itk
+          key: windows-2022-itk-${{ env.ITK_VERSION }}-static-v1
+
+      - name: Check out ITK
+        if: steps.cache-itk.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: InsightSoftwareConsortium/ITK.git
+          ref: ${{ env.ITK_VERSION }}
+          submodules: recursive
+          path: itk
+
+      - name: Build ITK
+        if: steps.cache-itk.outputs.cache-hit != 'true'
+        run: |
+          cmake -S itk -B itk/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/itk/install" \
+            -DBUILD_TESTING=OFF \
+            -DBUILD_EXAMPLES=OFF \
+            -DModule_MorphologicalContourInterpolation=ON \
+            -DCMAKE_EXE_LINKER_FLAGS=/FORCE:MULTIPLE \
+            -DCMAKE_SHARED_LINKER_FLAGS=/FORCE:MULTIPLE
+          cmake --build itk/build --target install -- -k 0
+
+      - name: Check out patched ITK-SNAP
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          path: itksnap
+
+      - name: Configure patched ITK-SNAP
+        run: |
+          cmake -S itksnap -B itksnap/build -G Ninja \
+            ${{ steps.vcpkg.outputs.vcpkg-cmake-config }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DITK_DIR="${GITHUB_WORKSPACE}/itk/build" \
+            -DVTK_DIR="${GITHUB_WORKSPACE}/vtk/install/lib/cmake/vtk-${VTK_VERSION}" \
+            -DCURL_LIBRARY="${GITHUB_WORKSPACE}/vcpkg/installed/x64-windows-release/lib/libcurl.lib" \
+            -DCURL_INCLUDE_DIR="${GITHUB_WORKSPACE}/vcpkg/installed/x64-windows-release/include" \
+            -DCMAKE_EXE_LINKER_FLAGS=/FORCE:MULTIPLE \
+            -DCMAKE_SHARED_LINKER_FLAGS=/FORCE:MULTIPLE \
+            -DDO_UPLOAD=OFF \
+            -DSITE=github-runner-windows-patched
+
+      - name: Build patched ITK-SNAP
+        run: cmake --build itksnap/build -- -k 0
+
+      - name: Run orientation regression tests
+        run: ctest --test-dir itksnap/build --output-on-failure -R '^ImageCoordinateGeometryTest$'
+
+      - name: Create unsigned NSIS installer
+        working-directory: itksnap/build
+        run: |
+          cpack --verbose
+          package_path="$(find . -maxdepth 1 -type f -iname 'itksnap-patched-*.exe' -print -quit)"
+          test -n "$package_path"
+          cp "$package_path" ITK-SNAP-Patched-4.4.0-Windows-x64.exe
+          sha256sum ITK-SNAP-Patched-4.4.0-Windows-x64.exe \
+            > ITK-SNAP-Patched-4.4.0-Windows-x64.exe.sha256
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ITK-SNAP-Patched-4.4.0-Windows-x64
+          path: |
+            itksnap/build/ITK-SNAP-Patched-4.4.0-Windows-x64.exe
+            itksnap/build/ITK-SNAP-Patched-4.4.0-Windows-x64.exe.sha256
+          if-no-files-found: error
+          retention-days: 14

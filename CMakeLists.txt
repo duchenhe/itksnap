@@ -196,6 +196,12 @@ IF(SNAP_USE_OSMESA)
 ENDIF()
 
 SET(CPACK_PACKAGE_FILE_NAME "${CPACK_SOURCE_PACKAGE_FILE_NAME}-${CPACK_SYSTEM_NAME}")
+IF(WIN32)
+  # Keep patched Windows packages visually and operationally separate from an
+  # upstream ITK-SNAP installation.
+  SET(CPACK_PACKAGE_FILE_NAME
+      "itksnap-patched-${SNAP_VERSION_FULL}-${SNAP_VERSION_RELEASE_DATE}-${CPACK_SYSTEM_NAME}")
+ENDIF(WIN32)
 
 # Additional CPack resources
 SET(CPACK_RESOURCE_FILE_LICENSE "${SNAP_SOURCE_DIR}/COPYING")
@@ -1099,6 +1105,11 @@ ENDIF( CMAKE_GENERATOR MATCHES "^NMake" OR CMAKE_GENERATOR MATCHES "^Visual Stud
 # ITK Libraries
 SET(SNAP_ITK_LIBS ${ITK_LIBRARIES})
 
+IF(TARGET VTK::RenderingExternal)
+  ADD_DEFINITIONS(-DSNAP_HAVE_VTK_RENDERING_EXTERNAL)
+  SET(SNAP_VTK_RENDERING_EXTERNAL_LIB VTK::RenderingExternal)
+ENDIF()
+
 # VTK libs without QT
 SET(SNAP_VTK_NONQT_LIBS
   VTK::ChartsCore
@@ -1124,7 +1135,7 @@ SET(SNAP_VTK_NONQT_LIBS
   VTK::RenderingAnnotation
   VTK::RenderingContextOpenGL2
   VTK::RenderingCore
-  VTK::RenderingExternal
+  ${SNAP_VTK_RENDERING_EXTERNAL_LIB}
   VTK::RenderingLOD
   VTK::RenderingOpenGL2
   VTK::RenderingUI
@@ -1255,8 +1266,13 @@ IF(WIN32)
 ENDIF(WIN32)
 
 
-# Define the main SNAP executable
-SET(SNAP_BUNDLE_NAME ITK-SNAP)
+# Define the main SNAP executable.  The Windows build uses a distinct filename
+# so it can coexist with the upstream application on a collaborator's machine.
+IF(WIN32)
+  SET(SNAP_BUNDLE_NAME ITK-SNAP-Patched)
+ELSE()
+  SET(SNAP_BUNDLE_NAME ITK-SNAP)
+ENDIF()
 
 # Configure the executable's sources and libraries
 qt_add_executable(${SNAP_BUNDLE_NAME} WIN32 ${SNAP_MAIN_SRC})
@@ -1397,6 +1413,17 @@ TARGET_LINK_LIBRARIES(logic_api_test ${SNAP_EXTERNAL_LIBS} itksnaplogic)
 TARGET_INCLUDE_DIRECTORIES(logic_api_test PUBLIC ${SNAP_INCLUDE_DIRS})
 
 add_test(NAME IRISApplicationTest COMMAND logic_api_test)
+
+# Regression coverage for global anatomical-axis assignment of oblique images.
+ADD_EXECUTABLE(image_coordinate_geometry_test
+    Testing/Logic/ImageCoordinateGeometryTest.cxx)
+TARGET_LINK_LIBRARIES(image_coordinate_geometry_test
+    ${SNAP_EXTERNAL_LIBS} itksnaplogic)
+TARGET_INCLUDE_DIRECTORIES(image_coordinate_geometry_test PUBLIC
+    ${SNAP_INCLUDE_DIRS})
+
+add_test(NAME ImageCoordinateGeometryTest
+    COMMAND image_coordinate_geometry_test)
 
 # Set up a test for each GUI test
 FOREACH(GUI_TEST ${GUI_TESTS})
@@ -1661,8 +1688,8 @@ ELSEIF(WIN32)
 
   # On windows, we have to configure NSIS
   SET(CPACK_NSIS_MUI_ICON "${SNAP_SOURCE_DIR}/Utilities/Win32/snaplogo.ico")
-  SET(CPACK_NSIS_INSTALLED_ICON_NAME "ITK-SNAP.exe")
-  SET(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY} ITK-SNAP")
+  SET(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${SNAP_BUNDLE_NAME}.exe")
+  SET(CPACK_NSIS_DISPLAY_NAME "ITK-SNAP Patched ${SNAP_VERSION_MAJOR}.${SNAP_VERSION_MINOR}")
   SET(CPACK_NSIS_HELP_LINK "http:\\\\\\\\www.itksnap.org")
   SET(CPACK_NSIS_URL_INFO_ABOUT "http:\\\\\\\\www.itksnap.org/credits.php")
   SET(CPACK_NSIS_MODIFY_PATH ON)
@@ -1674,10 +1701,14 @@ ELSEIF(WIN32)
   ENDIF(CMAKE_CL_64)
 
   # Give it a windowsy directory name
-  SET(CPACK_PACKAGE_INSTALL_DIRECTORY "ITK-SNAP ${SNAP_VERSION_MAJOR}.${SNAP_VERSION_MINOR}")
+  SET(CPACK_PACKAGE_NAME "ITK-SNAP-Patched")
+  SET(CPACK_PACKAGE_INSTALL_DIRECTORY
+      "ITK-SNAP Patched ${SNAP_VERSION_MAJOR}.${SNAP_VERSION_MINOR}")
+  SET(CPACK_PACKAGE_INSTALL_REGISTRY_KEY
+      "ITK-SNAP Patched ${SNAP_VERSION_MAJOR}.${SNAP_VERSION_MINOR}")
   
   # On Win32, the executable is the actual exe
-  SET(CPACK_PACKAGE_EXECUTABLES ITK-SNAP "ITK-SNAP")
+  SET(CPACK_PACKAGE_EXECUTABLES ${SNAP_BUNDLE_NAME} "ITK-SNAP Patched")
 
   # On Win32, we must include the redistributable
   IF(MSVC_VERSION GREATER 1399)
@@ -1702,8 +1733,8 @@ ELSEIF(WIN32)
   ENDIF(MSVC_VERSION GREATER 1399)
 
   # Try setting the MSVC environment so we can debug from MSVC
-  set_target_properties(ITK-SNAP PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:ITK-SNAP>"
-                                            VS_DEBUGGER_COMMAND           "$<TARGET_FILE:ITK-SNAP>"
+  set_target_properties(${SNAP_BUNDLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${SNAP_BUNDLE_NAME}>"
+                                            VS_DEBUGGER_COMMAND           "$<TARGET_FILE:${SNAP_BUNDLE_NAME}>"
                                             VS_DEBUGGER_ENVIRONMENT       "PATH=%PATH%;${VTK_DIR}/bin/Debug;${Qt6_DIR}/../../../bin;")
 
 ELSE()
