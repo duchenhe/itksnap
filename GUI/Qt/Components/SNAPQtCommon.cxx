@@ -665,8 +665,18 @@ public:
       QT_TRANSLATE_NOOP("ColorMap", "Speed image (blue to black to white)"),
       QT_TRANSLATE_NOOP("ColorMap", "Speed image (semi-transparent overlay)"),
       QT_TRANSLATE_NOOP("ColorMap", "Level set image"),
+      QT_TRANSLATE_NOOP("ColorMap", "Inferno"),
+      QT_TRANSLATE_NOOP("ColorMap", "Viridis"),
+      QT_TRANSLATE_NOOP("ColorMap", "Plasma"),
+      QT_TRANSLATE_NOOP("ColorMap", "Magma"),
+      QT_TRANSLATE_NOOP("ColorMap", "Cividis"),
+      QT_TRANSLATE_NOOP("ColorMap", "Turbo"),
       QT_TRANSLATE_NOOP("ColorMap", "Custom")
     };
+
+    static_assert(sizeof(preset_names) / sizeof(preset_names[0]) ==
+                  static_cast<size_t>(ColorMap::COLORMAP_CUSTOM) + 1,
+                  "Color map preset name table is out of sync with SystemPreset");
 
     if(translated)
       return QCoreApplication::translate("ColorMap", preset_names[preset]).toStdString();

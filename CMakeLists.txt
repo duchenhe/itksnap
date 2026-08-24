@@ -1425,6 +1425,17 @@ TARGET_INCLUDE_DIRECTORIES(image_coordinate_geometry_test PUBLIC
 add_test(NAME ImageCoordinateGeometryTest
     COMMAND image_coordinate_geometry_test)
 
+# Regression coverage for the additional perceptually uniform color maps.
+ADD_EXECUTABLE(color_map_preset_test
+    Testing/Logic/ColorMapPresetTest.cxx)
+TARGET_LINK_LIBRARIES(color_map_preset_test
+    ${SNAP_EXTERNAL_LIBS} itksnaplogic)
+TARGET_INCLUDE_DIRECTORIES(color_map_preset_test PUBLIC
+    ${SNAP_INCLUDE_DIRS})
+
+add_test(NAME ColorMapPresetTest
+    COMMAND color_map_preset_test)
+
 # Set up a test for each GUI test
 FOREACH(GUI_TEST ${GUI_TESTS})
 

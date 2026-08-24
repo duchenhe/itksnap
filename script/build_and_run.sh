@@ -49,8 +49,8 @@ pkill -x ITK-SNAP-Patched >/dev/null 2>&1 || true
   -DSNAP_USE_VTK_RENDERING_EXTERNAL=OFF \
   -DCMAKE_OSX_ARCHITECTURES=arm64 \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=12.6
-"$CMAKE_BIN" --build "$BUILD_DIR" --target ITK-SNAP image_coordinate_geometry_test --parallel 8
-"$CTEST_BIN" --test-dir "$BUILD_DIR" --output-on-failure -R '^ImageCoordinateGeometryTest$'
+"$CMAKE_BIN" --build "$BUILD_DIR" --target ITK-SNAP image_coordinate_geometry_test color_map_preset_test --parallel 8
+"$CTEST_BIN" --test-dir "$BUILD_DIR" --output-on-failure -R '^(ImageCoordinateGeometryTest|ColorMapPresetTest)$'
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
   mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
