@@ -92,22 +92,46 @@ def bundled_target(frameworks: Path, dependency: str) -> Path:
     return frameworks / Path(dependency).name
 
 
-def copy_dependency(frameworks: Path, dependency: str) -> bool:
+def copy_dependency(
+    frameworks: Path, dependency: str, source: Path | None = None
+) -> bool:
     framework = framework_parts(dependency)
     if framework:
         name, _ = framework
         destination = frameworks / name
         if destination.exists():
             return False
-        source_root = Path(dependency.split(".framework/", 1)[0] + ".framework")
+        source_dependency = str(source) if source else dependency
+        source_root = Path(
+            source_dependency.split(".framework/", 1)[0] + ".framework"
+        )
         run("ditto", str(source_root), str(destination))
         return True
 
     destination = frameworks / Path(dependency).name
     if destination.exists():
         return False
-    shutil.copy2(Path(dependency).resolve(), destination)
+    source_path = source if source else Path(dependency)
+    shutil.copy2(source_path.resolve(), destination)
     return True
+
+
+def resolve_homebrew_rpath_dependency(dependency: str) -> Path | None:
+    """Resolve a missing @rpath dependency from common Homebrew lib roots."""
+    if not dependency.startswith("@rpath/"):
+        return None
+
+    relative = Path(dependency.removeprefix("@rpath/"))
+    roots = [Path("/opt/homebrew/lib"), Path("/usr/local/lib")]
+    for prefix in (Path("/opt/homebrew/opt"), Path("/usr/local/opt")):
+        if prefix.is_dir():
+            roots.extend(path / "lib" for path in sorted(prefix.iterdir()))
+
+    for root in roots:
+        candidate = root / relative
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def loader_reference(binary: Path, target: Path) -> str:
@@ -138,6 +162,14 @@ def fix_bundle(app: Path) -> None:
             for dependency in dependencies(binary):
                 if dependency.startswith("/") and not dependency.startswith(SYSTEM_PREFIXES):
                     copied = copy_dependency(frameworks, dependency) or copied
+                elif dependency.startswith("@rpath/"):
+                    target = bundled_target(frameworks, dependency)
+                    if not target.exists():
+                        source = resolve_homebrew_rpath_dependency(dependency)
+                        if source:
+                            copied = copy_dependency(
+                                frameworks, dependency, source
+                            ) or copied
         if not copied:
             break
 
@@ -150,9 +182,23 @@ def fix_bundle(app: Path) -> None:
                 bundled_install_id(binary, frameworks),
                 str(binary),
             )
+            identity = install_id(binary)
 
         for dependency in dependencies(binary):
+            if dependency == identity:
+                continue
             if dependency.startswith("/") and not dependency.startswith(SYSTEM_PREFIXES):
+                target = bundled_target(frameworks, dependency)
+                if not target.exists():
+                    raise RuntimeError(f"Missing bundled dependency for {dependency}")
+                run(
+                    "install_name_tool",
+                    "-change",
+                    dependency,
+                    loader_reference(binary, target),
+                    str(binary),
+                )
+            elif dependency.startswith("@rpath/"):
                 target = bundled_target(frameworks, dependency)
                 if not target.exists():
                     raise RuntimeError(f"Missing bundled dependency for {dependency}")
@@ -170,9 +216,14 @@ def fix_bundle(app: Path) -> None:
 
     leaks: list[str] = []
     for binary in macho_files(contents):
+        identity = install_id(binary)
         for dependency in dependencies(binary):
+            if dependency == identity:
+                continue
             if dependency.startswith("/") and not dependency.startswith(SYSTEM_PREFIXES):
                 leaks.append(f"{binary}: {dependency}")
+            elif dependency.startswith("@rpath/"):
+                leaks.append(f"{binary}: unresolved {dependency}")
         for rpath in rpaths(binary):
             if rpath.startswith(("/opt/homebrew/", "/Users/")):
                 leaks.append(f"{binary}: LC_RPATH {rpath}")

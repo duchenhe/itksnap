@@ -952,7 +952,7 @@ main(int argc, char *argv[])
     vtkNew<vtkTextActor> txt;
     txt->SetInput("Hello World");
     txt->SetPosition(10, 10);
-    renderer_2->AddActor2D(txt);
+    renderer_2->AddViewProp(txt);
 
     // Place some overlay text in window 1
     vtkNew<vtkRenderer> renderer_3;
@@ -960,7 +960,7 @@ main(int argc, char *argv[])
     vtkNew<vtkTextActor> txt2;
     txt2->SetInput("Overlay");
     txt2->SetPosition(10, 10);
-    renderer_3->AddActor2D(txt2);
+    renderer_3->AddViewProp(txt2);
     window_1->AddRenderer(renderer_3);
     window_1->SetNumberOfLayers(2);
 
