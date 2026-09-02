@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - codex/fix-oblique-orientation
+      - codex/add-medical-colormaps
   workflow_dispatch:
 
 permissions:
